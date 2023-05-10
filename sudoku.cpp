@@ -7,7 +7,6 @@
 
 Sudoku::Sudoku() : board(10, std::vector<int>(10, 0))
 {
-    Clear();
 }
 
 void Sudoku::SetBoard(const std::vector<std::vector<int>>& setup)
@@ -22,18 +21,17 @@ bool Sudoku::TryMove(int x, int y, int val)
         Set(x, y, val);
         return true;
     }
-        
     return false;
 }
 
-void Sudoku::Solve()
+const std::vector<std::vector<std::vector<int>>>& Sudoku::Solve()
 {
-    CopyBoard(board, board_copy);
-    recursive_count = 0;
+    solutions.clear();
     SolveNext(0, 0);
+    return solutions;
 }
 
-void Sudoku::Print()
+void Sudoku::Print(const std::vector<std::vector<int>>& board) const
 {
     printf(" --- --- --- \n");
     for (int y = 0; y < ROWS; y++)
@@ -41,10 +39,10 @@ void Sudoku::Print()
         printf("|");
         for (int x = 0; x < COLS; x++)        
         {
-            if (IsEmpty(x, y))
+            if (IsEmpty(board, x, y))
                 printf(".");
             else
-                printf("%d", Get(x,y));
+                printf("%d", Get(board, x,y));
             if (x % 3 == 2)
                 printf("|");
         }
@@ -55,9 +53,10 @@ void Sudoku::Print()
     printf("\n");
 }
 
-bool Sudoku::SolveNext(int x, int y)
+void Sudoku::SolveNext(int x, int y)
 {
-    recursive_count++;
+    if (solutions.size() >= max_solutions)
+        return;
 
     // Advance to next empty place from here
     while (y < ROWS && x < COLS && !IsEmpty(x, y))
@@ -71,8 +70,8 @@ bool Sudoku::SolveNext(int x, int y)
     }
     if (y == COLS)
     {
-        Print();
-        return true;
+        solutions.push_back(board);
+        return;
     }
 
     // Solve this field, if ok then continue with the next free field
@@ -80,24 +79,10 @@ bool Sudoku::SolveNext(int x, int y)
     {
         if (TryMove(x, y, value))
         {
-            if (SolveNext(x, y))
-            {
-                recursive_count--;
-                SetEmpty(x, y);
-                if (recursive_count > 1)
-                {
-                    return true;
-                }
-                else
-                {
-                    CopyBoard(board_copy, board);   // restart
-                }
-            }
-            SetEmpty(x, y);  // No solution after this one, so must set empty
+            SolveNext(x, y);
+            SetEmpty(x, y);
         }
     }
-    recursive_count--;
-    return false;
 }
 
 // Test move, assign to board if valid
@@ -133,27 +118,31 @@ bool Sudoku::TestBlock(int x, int y, int val) const
     return true;
 }
 
-void Sudoku::Clear()
-{
-    for (int x = 0; x < COLS; x++)
-        for (int y = 0; y < ROWS; y++)
-            SetEmpty(x, y);
-}
-
 void Sudoku::CopyBoard(const std::vector<std::vector<int>>& src, std::vector<std::vector<int>>& dest)
 {
     dest = src;
 }
 
-int main()
+
+void Solve(const std::vector<std::vector<int>>& game)
 {
     auto sudoku = Sudoku();
-    printf("%d\n", sudoku.TryMove(0, 0, 0));
-    printf("%d\n", sudoku.TryMove(1, 0, 1));
-    printf("%d\n", sudoku.TryMove(2, 0, 2));
-    printf("%d\n", sudoku.TryMove(3, 0, 2));
+    sudoku.SetBoard(game);
 
-    std::vector<std::vector<int>> setup = {
+    printf("Solve game:\n");
+    sudoku.Print(game);
+    auto solutions = sudoku.Solve();
+
+    printf("%d solutions found:\n", solutions.size());
+    if (solutions.size() > 10)
+        return;
+    for (auto const& solution : solutions)
+        sudoku.Print(solution);
+}
+
+int main()
+{
+    std::vector<std::vector<int>> solved_game = {
         {4, 3, 1, 6, 7, 9, 5, 2, 8},
         {9, 6, 7, 2, 5, 8, 3, 4, 1},
         {5, 8, 2, 1, 4, 3, 9, 6, 7},
@@ -164,13 +153,6 @@ int main()
         {1, 4, 5, 3, 9, 6, 7, 8, 2},
         {2, 9, 6, 7, 8, 5, 4, 1, 3}
     };
-    //setup[0][0] = -1;
-    //setup[0][1] = -1;
-    //setup[4][0] = -1;
-    //setup[3][3] = -1;
-    //setup[6][6] = -1;
-    //sudoku.SetBoard(setup);
-    //sudoku.Solve();
 
     std::vector<std::vector<int>> game1 = {
         {0,8,0,1,0,4,0,9,0},
@@ -185,7 +167,7 @@ int main()
     };
 
     std::vector<std::vector<int>> game2 = {
-        {0,0,0,0,0,0,0,0,0},
+        {0,8,0,1,0,0,0,0,0},    // set a few more fields to 0
         {2,0,0,0,0,0,0,0,5},
         {0,0,0,0,2,0,0,0,0},
         {5,0,0,0,3,0,0,0,1},
@@ -196,13 +178,22 @@ int main()
         {4,0,8,0,0,0,5,0,7}
     };
 
-    //sudoku.SetBoard(game1);
-    //sudoku.Print();
-    //sudoku.Solve();
+    std::vector<std::vector<int>> game3 = {
+        {0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0,0},
+        {1,0,0,2,0,8,0,0,6},
+        {0,2,6,0,0,0,3,5,0},
+        {0,7,3,0,0,0,4,1,0},
+        {0,0,0,0,1,0,0,0,0},
+        {4,0,8,0,0,0,5,0,7}
+    };
 
-    sudoku.SetBoard(game2);
-    sudoku.Print();
-    sudoku.Solve();
+
+    Solve(game1);
+    Solve(game2);
+    Solve(game3);
 
     return 0;
 }
